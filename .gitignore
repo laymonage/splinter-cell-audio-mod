@@ -1,0 +1,13 @@
+# Game and audio assets are user-provided and must stay out of this repository.
+Splinter Cell/
+*.LS0
+*.SS0
+*.SM0
+*.LM0
+*.uax
+*.ogg
+*.wav
+*.pcm
+*.bak
+*.zip
+__pycache__/
