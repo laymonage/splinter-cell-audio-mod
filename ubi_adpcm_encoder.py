@@ -112,6 +112,11 @@ def _i16(value: int) -> int:
     return value - 0x10000 if value >= 0x8000 else value
 
 
+def _i32(value: int) -> int:
+    value &= 0xFFFFFFFF
+    return value - 0x100000000 if value >= 0x80000000 else value
+
+
 def _clamp16(value: int) -> int:
     return max(-32768, min(32767, value))
 
@@ -133,8 +138,8 @@ def expand_code_4bit(code: int, state: ChannelState) -> int:
     if step_index > 7:
         raise ValueError(f"4-bit code {code} is outside the supported range 0..14")
 
-    step_next = ADPCM4_TABLE1[step_index] + state.step1
-    step = ((state.step1 & 0xFFFF) * 246 + ADPCM4_TABLE2[step_index]) >> 8
+    step_next = _i32(ADPCM4_TABLE1[step_index] + state.step1)
+    step = _i32((state.step1 & 0xFFFF) * 246 + ADPCM4_TABLE2[step_index]) >> 8
     step = max(271, min(2560, step))
 
     if ((step_next & 0xFFFFFF00) - 1) & 0x80000000:
@@ -142,17 +147,17 @@ def expand_code_4bit(code: int, state: ChannelState) -> int:
     else:
         delta_index = ((step_next >> 3) & 0x1F) + (33 if code_signed < 0 else 0)
         delta_shift = max(0, min(31, (step_next >> 8) & 0xFF))
-        delta = (DELTA_TABLE[delta_index] << delta_shift) >> 10
+        delta = _i32(DELTA_TABLE[delta_index] << delta_shift) >> 10
 
-    next_value = _i16((
+    next_value = _i16(_i32(
         state.mod1 * state.delta1
         + state.mod2 * state.delta2
         + state.mod3 * state.delta3
         + state.mod4 * state.delta4
     ) >> 10)
+    prediction = _i32(state.coef1 * state.hist1 + state.coef2 * state.hist2) >> 10
     sample = _i16(
-        delta + next_value
-        + ((state.coef1 * state.hist1 + state.coef2 * state.hist2) >> 10)
+        _i32(delta + next_value + prediction)
     )
 
     coef1_next = state.coef1 * 255
