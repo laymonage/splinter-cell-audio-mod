@@ -1,6 +1,6 @@
 # Splinter Cell dialogue audio modding
 
-This project replaces mono dialogue clips in Splinter Cell 1 PC English `.LS0` banks with custom audio. The banks use Ubisoft's legacy 4-bit ADPCM codec at 36 kHz. The encoder is experimental but has successfully replaced and decoded two Lambert lines in the training bank. [Ubitunedec](https://github.com/ldeon/Ubitunedec) provides the reference decoder used to check encoded clips.
+This project replaces mono dialogue clips in Splinter Cell 1 PC English `.LS0` banks with custom audio. The banks use Ubisoft's legacy 4-bit ADPCM codec at 36 kHz. The encoder is experimental but has successfully replaced and decoded two Lambert lines in the training bank. [DecUbiSnd](https://github.com/laymonage/DecUbiSnd) provides the reference decoder used to check encoded clips.
 
 ## Known working replacements
 
@@ -13,21 +13,15 @@ This project replaces mono dialogue clips in Splinter Cell 1 PC English `.LS0` b
 2. Convert the replacement/crop to mono signed 16-bit PCM WAV at 36 kHz, with exactly the target segment's sample count.
 3. Keep an untouched bank copy. Run the encoder to a separate output file:
 
-   ```sh
-   python3 ubi_adpcm_encoder.py \
-     --template path/to/original.LS0 \
-     --input replacement.wav \
-     --offset 564212 \
-     --output /tmp/replacement.LS0
+     ```powershell
+     python .\ubi_adpcm_encoder.py --template path\to\original.LS0 --input replacement.wav --offset 564212 --output .\replacement.LS0
    ```
 
-   Omit `--offset` for the first segment. Use `--preview path/to/model-preview.wav` only as a rough encoder-model preview.
-4. Decode the candidate with Ubitunedec's bundled legacy decoder and listen before installing. For a mono 4-bit segment:
+    Omit `--offset` for the first segment. Use `--preview path\to\model-preview.wav` only as a rough encoder-model preview.
+4. Decode the candidate with DecUbiSnd's legacy decoder and listen before installing. For a mono 4-bit segment:
 
-   ```sh
-   UbitunedecCMD.exe /tmp/replacement.LS0 \
-     --input-type ubi_6or4 --mono --offset 564212 --size 108588 \
-     --raw --output /tmp/decoded.pcm
+     ```powershell
+     .\DecUbiSnd.exe .\replacement.LS0 --input-type ubi_6or4 --mono --offset 564212 --size 108588 --raw --output .\decoded.pcm
    ```
 
    Wrap the raw 36 kHz mono signed 16-bit PCM in a WAV to listen. The encoder's portable-model self-check is **not** a substitute for this reference-decoder check.
