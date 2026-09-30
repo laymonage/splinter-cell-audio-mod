@@ -216,23 +216,33 @@ def _subframe_counts(header: BankHeader) -> list[int]:
 def _unpack_codes(data: bytes, count: int) -> list[int]:
     codes: list[int] = []
     for offset in range(0, len(data), 4):
-        word = int.from_bytes(data[offset:offset + 4], "little")
+        chunk = data[offset:offset + 4]
+        word = int.from_bytes(chunk, "little") << (4 - len(chunk)) * 8
         codes.extend((word >> shift) & 0xF for shift in range(28, -1, -4))
     return codes[:count]
 
 
 def _pack_codes(codes: Iterable[int]) -> bytes:
     values = list(codes)
-    if len(values) % 8:
-        raise ValueError("Ubisoft 4-bit subframes must contain a multiple of 8 codes")
     packed = bytearray()
-    for offset in range(0, len(values), 8):
+    full_code_count = len(values) - len(values) % 8
+    for offset in range(0, full_code_count, 8):
         word = 0
         for code in values[offset:offset + 8]:
             if not 0 <= code <= 14:
                 raise ValueError(f"unsupported 4-bit code: {code}")
             word = (word << 4) | code
         packed.extend(word.to_bytes(4, "little"))
+    remaining = values[full_code_count:]
+    if remaining:
+        word = 0
+        for code in remaining:
+            if not 0 <= code <= 14:
+                raise ValueError(f"unsupported 4-bit code: {code}")
+            word = (word << 4) | code
+        word <<= (8 - len(remaining)) * 4
+        byte_count = (len(remaining) + 1) // 2
+        packed.extend(word.to_bytes(4, "little")[-byte_count:])
     return bytes(packed)
 
 
@@ -258,10 +268,15 @@ def parse_bank_segment(segment: bytes) -> tuple[BankHeader, list[Frame], int, by
         for code_count in all_counts[count_index:count_index + 2]:
             data_size = (code_count * BITS_PER_SAMPLE + 7) // 8
             end = cursor + data_size
-            if end + 1 > len(segment):
+            is_final_partial_subframe = (
+                count_index + len(subframes) == len(all_counts) - 1
+                and code_count % 8 != 0
+            )
+            if end + (0 if is_final_partial_subframe else 1) > len(segment):
                 raise ValueError("truncated ADPCM subframe in audio segment")
-            subframes.append(Subframe(code_count, segment[cursor:end], segment[end:end + 1]))
-            cursor = end + 1
+            padding = b"" if is_final_partial_subframe else segment[end:end + 1]
+            subframes.append(Subframe(code_count, segment[cursor:end], padding))
+            cursor = end + len(padding)
         frames.append(Frame(state, tuple(subframes)))
         count_index += len(subframes)
 
@@ -341,8 +356,14 @@ def encode_segment(template: bytes, input_wav: Path) -> tuple[bytes, list[int]]:
         for subframe in frame.subframes:
             target = input_samples[sample_offset:sample_offset + subframe.code_count]
             sample_offset += subframe.code_count
-            result.extend(_encode_subframe(target, state))
-            result.extend(subframe.padding)
+            encoded_data = _encode_subframe(target, state)
+            if len(encoded_data) == len(subframe.data):
+                result.extend(encoded_data)
+                result.extend(subframe.padding)
+            elif len(encoded_data) == len(subframe.data) + len(subframe.padding):
+                result.extend(encoded_data)
+            else:
+                raise ValueError("partial ADPCM subframe does not fit the template layout")
     result.extend(padding)
 
     if len(result) != segment_size:
