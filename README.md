@@ -1,6 +1,6 @@
 # Splinter Cell dialogue audio modding
 
-This project replaces mono dialogue clips in Splinter Cell 1 PC English `.LS0` banks with custom audio. The banks use Ubisoft's legacy 4-bit ADPCM codec at 36 kHz. The encoder is experimental but has successfully replaced and decoded two Lambert lines in the training bank. [DecUbiSnd](https://github.com/laymonage/DecUbiSnd) provides the reference decoder used to check encoded clips.
+This project replaces mono dialogue clips in Splinter Cell 1 PC English `.LS0` banks with custom audio. The banks use Ubisoft's legacy 4-bit ADPCM codec at 36 kHz. Use [DecUbiSnd](https://github.com/laymonage/DecUbiSnd)'s experimental audio-replacement feature to encode and replace segments, then use its decoder to verify the result.
 
 ## Known working replacements
 
@@ -36,25 +36,25 @@ This project replaces mono dialogue clips in Splinter Cell 1 PC English `.LS0` b
      ffmpeg -i replacement.mp3 -vn -af "atempo=0.8" -ac 1 -ar 36000 -c:a pcm_s16le slower.wav
      ```
 
-   These examples illustrate cropping and tempo changes; adjust their values for the target segment and verify the resulting WAV has exactly the required sample count.
-3. Keep an untouched bank copy. Run the encoder to a separate output file:
+   These examples illustrate cropping and tempo changes; adjust their values for the target segment and verify the resulting WAV has exactly the required sample count. DecUbiSnd does not resample or trim the WAV for you.
+3. Keep an untouched bank copy. Use DecUbiSnd's replacement command to write a separate output bank:
 
      ```powershell
-     python .\ubi_adpcm_encoder.py --template path\to\original.LS0 --input replacement.wav --offset 564212 --output .\replacement.LS0
+   .\DecUbiSnd.exe .\original.LS0 --replace --replacement-wav .\replacement.wav --offset 564212 --output .\replacement.LS0
    ```
 
-    Omit `--offset` for the first segment. Use `--preview path\to\model-preview.wav` only as a rough encoder-model preview.
-4. Decode the candidate with DecUbiSnd's legacy decoder and listen before installing. For a mono 4-bit segment:
+   Use the segment's byte offset; use `--offset 0` for the first segment. Alternatively, open or scan the bank in the GUI, select a mono 4-bit segment, choose **Replace Segment...**, select the replacement WAV, and save to an output bank. You can overwrite the source bank, but only after making a backup.
+4. Scan the output bank with DecUbiSnd, decode the replacement segment, and listen to confirm it sounds correct. For a mono 4-bit segment:
 
      ```powershell
      .\DecUbiSnd.exe .\replacement.LS0 --input-type ubi_6or4 --mono --offset 564212 --size 108588 --raw --output .\decoded.pcm
    ```
 
-   Wrap the raw 36 kHz mono signed 16-bit PCM in a WAV to listen. The encoder's portable-model self-check is **not** a substitute for this reference-decoder check.
-5. Back up the installed bank, then replace only after confirming the decoded candidate. Preserve the bank's total size and verify other known replacements still decode unchanged.
+   Wrap the raw 36 kHz mono signed 16-bit PCM in a WAV to listen. A successful replacement only confirms format and size checks; it does not confirm in-game playback.
+5. Install the verified output bank. Preserve the original backup and verify other known replacements still decode unchanged.
 
-The encoder currently requires an input WAV with the exact sample count from the target bank segment; it does not resample or trim automatically. Never use its output without the legacy-decoder/listening check.
+The replacement feature currently supports only mono 4-bit ADPCM segments in Splinter Cell 1 PC `.LS0` banks. It requires an input WAV with the exact sample count from the target segment and does not resample or trim automatically. Never install an output without decoding and listening to it first.
 
 ## Repository contents
 
-This repo intentionally contains only the encoder and documentation. Game files, sound banks, source audio, previews, and backups are excluded; obtain and keep those locally.
+The Python encoder remains in the repository but is not needed for the workflow above. Game files, sound banks, source audio, previews, and backups are excluded; obtain and keep those locally.
